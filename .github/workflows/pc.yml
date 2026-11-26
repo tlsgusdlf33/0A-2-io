@@ -1,0 +1,24 @@
+# 앱제작 Windows 프로그램 빌드(.exe) → 비공개 저장소 Release
+name: pc
+on: [workflow_dispatch, workflow_call]
+permissions: {contents: read}
+jobs:
+  win:
+    runs-on: windows-latest
+    defaults: {run: {shell: bash}}
+    env: {GH_TOKEN: '${{ secrets.OA2_TOKEN }}', NTFY_TOPIC: '${{ secrets.NTFY_TOPIC }}', MAIL_USER: '${{ secrets.MAIL_USER }}', MAIL_PASS: '${{ secrets.MAIL_PASS }}', MAIL_TO: '${{ secrets.MAIL_TO }}', PYTHONUTF8: '1'}
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash .github/guard.sh
+      - uses: actions/checkout@v4
+        with: {repository: tlsgusdlf33/0A-2, token: '${{ secrets.OA2_TOKEN }}', path: src}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install -q -r src/pc/requirements.txt
+      - run: pyinstaller --noconfirm --onefile --windowed --name AppMaker --add-data "src/ui;ui" src/pc/appmaker.py > pyi.log 2>&1 || { tail -20 pyi.log; exit 1; }
+      - run: |
+          TAG="appmaker-pc-$(date -u +%Y%m%d-%H%M)"
+          URL=$(gh release create "$TAG" dist/AppMaker.exe --repo tlsgusdlf33/0A-2 --title "앱제작 PC 프로그램 $TAG" --notes "Windows 10/11용. 실행 후 설정 탭에 휴대폰과 같은 토큰을 입력하면 자동 연동됩니다.")
+          python src/tools/notify.py "앱제작 PC 프로그램 빌드 완료" "AppMaker.exe 를 받아 실행하세요." "$URL"
+      - if: always()
+        run: rm -rf src dist build

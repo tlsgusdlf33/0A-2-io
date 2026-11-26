@@ -1,0 +1,52 @@
+# 앱 빌드: 비공개 저장소의 소스·서명키를 OA2_TOKEN 으로 가져와 빌드 → APK/AAB 를 비공개 저장소 Release 로만 업로드
+name: build
+on:
+  workflow_dispatch:
+    inputs: {app: {required: true, description: 'apps/<id>'}, req: {required: false, default: ''}}
+  workflow_call:
+    inputs: {app: {type: string, required: true}, req: {type: string, default: ''}}
+permissions: {contents: write, actions: write}
+env: {OWNER: tlsgusdlf33, PRIV_REPO: 0A-2}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      APP: '${{ inputs.app }}'
+      REQ: '${{ inputs.req }}'
+      GH_TOKEN: '${{ secrets.OA2_TOKEN }}'
+      NTFY_TOPIC: '${{ secrets.NTFY_TOPIC }}'
+      MAIL_USER: '${{ secrets.MAIL_USER }}'
+      MAIL_PASS: '${{ secrets.MAIL_PASS }}'
+      MAIL_TO: '${{ secrets.MAIL_TO }}'
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash .github/guard.sh
+      - run: '[[ "$APP" =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "잘못된 앱 id"; exit 1; }'
+      - uses: actions/checkout@v4
+        with: {repository: tlsgusdlf33/0A-2, token: '${{ secrets.OA2_TOKEN }}', path: src}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.11.1'}
+      - run: |
+          sudo apt-get install -y -qq fonts-noto-cjk >/dev/null 2>&1 || true
+          pip install -q pillow
+      - run: cd src && python3 tools/prepare.py "$APP"
+      - name: gradle (로그는 공개하지 않음)
+        run: cd work && gradle --no-daemon -q assembleRelease bundleRelease > ../build.log 2>&1 || { echo "빌드 실패"; exit 1; }
+      - run: cd src && python3 tools/release.py "$APP" "$REQ"
+      - name: 개인정보처리방침 페이지 갱신(공개)
+        run: |
+          python3 src/tools/privacy.py "$APP" > "privacy/$APP.html"
+          git config user.name appmaker-bot; git config user.email appmaker-bot@users.noreply.github.com
+          git add privacy && git commit -qm "privacy: $APP" && (git push -q || (git pull -q --rebase && git push -q)) || true
+      - name: 실패 시 자동 수정 요청
+        id: f
+        if: failure()
+        run: cd src && python3 tools/onfail.py "$APP" "$REQ"
+      - if: failure() && steps.f.outputs.retry == '1'
+        env: {GH_TOKEN: '${{ github.token }}'}
+        run: gh workflow run agent.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}"
+      - if: always()
+        run: rm -rf work src build.log dist

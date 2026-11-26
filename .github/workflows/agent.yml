@@ -1,0 +1,83 @@
+# 요청 처리 허브: 앱제작 앱/PC가 비공개 저장소 requests/ 에 요청을 쓰고 이 워크플로우를 실행(또는 20분마다 확인)
+name: agent
+on:
+  workflow_dispatch:
+  schedule: [{cron: '*/20 * * * *'}]
+permissions: {contents: write, actions: write}
+concurrency: {group: agent, cancel-in-progress: false}
+env: {OWNER: tlsgusdlf33, PRIV_REPO: 0A-2}
+jobs:
+  pick:
+    runs-on: ubuntu-latest
+    outputs: {id: '${{ steps.p.outputs.id }}', type: '${{ steps.p.outputs.type }}', more: '${{ steps.p.outputs.more }}'}
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash .github/guard.sh
+      - uses: actions/checkout@v4
+        with: {repository: tlsgusdlf33/0A-2, token: '${{ secrets.OA2_TOKEN }}', path: src}
+      - id: p
+        run: cd src && python3 tools/pick.py
+
+  agent:
+    needs: pick
+    if: contains(fromJSON('["new","modify","fix","extend"]'), needs.pick.outputs.type)
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    outputs: {apps: '${{ steps.a.outputs.apps }}', pc: '${{ steps.a.outputs.pc }}'}
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash .github/guard.sh
+      - uses: actions/checkout@v4
+        with: {repository: tlsgusdlf33/0A-2, token: '${{ secrets.OA2_TOKEN }}', path: src}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.11.1', cache-read-only: false}
+      - run: npm install -g @anthropic-ai/claude-code >/dev/null 2>&1
+      - id: a
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: '${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}'
+          ANTHROPIC_API_KEY: '${{ secrets.ANTHROPIC_API_KEY }}'
+          CLAUDE_MODEL: '${{ vars.CLAUDE_MODEL }}'
+          NTFY_TOPIC: '${{ secrets.NTFY_TOPIC }}'
+          MAIL_USER: '${{ secrets.MAIL_USER }}'
+          MAIL_PASS: '${{ secrets.MAIL_PASS }}'
+          MAIL_TO: '${{ secrets.MAIL_TO }}'
+          ID: '${{ needs.pick.outputs.id }}'
+        run: cd src && python3 tools/agent.py "$ID"
+
+  build:
+    needs: [pick, agent]
+    if: needs.agent.outputs.apps != '' && needs.agent.outputs.apps != '[]'
+    strategy: {fail-fast: false, matrix: {app: '${{ fromJSON(needs.agent.outputs.apps) }}'}}
+    uses: ./.github/workflows/build.yml
+    with: {app: '${{ matrix.app }}', req: '${{ needs.pick.outputs.id }}'}
+    secrets: inherit
+
+  pc:
+    needs: agent
+    if: needs.agent.outputs.pc == '1'
+    uses: ./.github/workflows/pc.yml
+    secrets: inherit
+
+  video:
+    needs: pick
+    if: needs.pick.outputs.type == 'video'
+    uses: ./.github/workflows/video.yml
+    with: {req: '${{ needs.pick.outputs.id }}'}
+    secrets: inherit
+
+  ideas:
+    needs: pick
+    if: needs.pick.outputs.type == 'ideas'
+    uses: ./.github/workflows/ideas.yml
+    with: {req: '${{ needs.pick.outputs.id }}'}
+    secrets: inherit
+
+  next:
+    needs: [pick, agent, build, pc, video, ideas]
+    if: always() && needs.pick.outputs.more == '1'
+    runs-on: ubuntu-latest
+    steps:
+      - env: {GH_TOKEN: '${{ github.token }}'}
+        run: gh workflow run agent.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}"
