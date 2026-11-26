@@ -32,7 +32,8 @@ jobs:
       - run: |
           sudo apt-get install -y -qq fonts-noto-cjk >/dev/null 2>&1 || true
           pip install -q pillow
-      - run: cd src && python3 tools/prepare.py "$APP"
+      - name: prepare (로그 비공개)
+        run: cd src && python3 tools/prepare.py "$APP" > ../build.log 2>&1 || { echo "준비 실패"; exit 1; }
       - name: gradle (로그는 공개하지 않음)
         run: cd work && gradle --no-daemon -q assembleRelease bundleRelease > ../build.log 2>&1 || { echo "빌드 실패"; exit 1; }
       - run: cd src && python3 tools/release.py "$APP" "$REQ"
