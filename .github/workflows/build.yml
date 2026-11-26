@@ -39,6 +39,7 @@ jobs:
       - run: cd src && python3 tools/release.py "$APP" "$REQ"
       - name: 개인정보처리방침 페이지 갱신(공개)
         run: |
+          grep -q '"internal": true' "src/apps/$APP/app.json" && exit 0
           python3 src/tools/privacy.py "$APP" > "privacy/$APP.html"
           git config user.name appmaker-bot; git config user.email appmaker-bot@users.noreply.github.com
           git add privacy && git commit -qm "privacy: $APP" && (git push -q || (git pull -q --rebase && git push -q)) || true

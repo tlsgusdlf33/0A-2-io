@@ -21,6 +21,9 @@ jobs:
       - run: |
           TAG="appmaker-pc-$(date -u +%Y%m%d-%H%M)"
           URL=$(gh release create "$TAG" dist/AppMaker.exe --repo tlsgusdlf33/0A-2 --title "앱제작 PC 프로그램 $TAG" --notes "Windows 10/11용. 실행 후 설정 탭에 휴대폰과 같은 토큰을 입력하면 자동 연동됩니다.")
+          for t in $(gh release list --repo tlsgusdlf33/0A-2 --limit 200 --json tagName -q '.[].tagName'); do
+            case "$t" in appmaker-pc-*) [ "$t" != "$TAG" ] && gh release delete "$t" --repo tlsgusdlf33/0A-2 --yes --cleanup-tag;; esac
+          done
           python src/tools/notify.py "앱제작 PC 프로그램 빌드 완료" "AppMaker.exe 를 받아 더블클릭하면 실행(첫 실행 시 바탕화면 아이콘 생성)." "$URL"
       - if: always()
         run: rm -rf src dist build

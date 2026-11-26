@@ -33,9 +33,11 @@ jobs:
         with: {distribution: temurin, java-version: '17'}
       - uses: gradle/actions/setup-gradle@v4
         with: {gradle-version: '8.11.1', cache-read-only: false}
-      - run: npm install -g @anthropic-ai/claude-code >/dev/null 2>&1
+      - run: npm install -g @google/gemini-cli @anthropic-ai/claude-code >/dev/null 2>&1
       - id: a
         env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_MODEL: '${{ vars.GEMINI_MODEL }}'
           CLAUDE_CODE_OAUTH_TOKEN: '${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}'
           ANTHROPIC_API_KEY: '${{ secrets.ANTHROPIC_API_KEY }}'
           CLAUDE_MODEL: '${{ vars.CLAUDE_MODEL }}'
