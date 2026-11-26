@@ -1,16 +1,19 @@
 # 비공개 저장소 릴리즈 정리: 앱별(태그의 "-v" 앞 / appmaker-pc / video 제외) 최신 1개만 남김
 name: cleanup
-on: [workflow_dispatch]
+on:
+  workflow_dispatch:
+    inputs: {delete_app: {description: '이 앱 ID의 릴리즈 전부 삭제(비우면 최신 1개만 유지)', default: ''}}
 permissions: {contents: read}
 jobs:
   prune:
     runs-on: ubuntu-latest
-    env: {GH_TOKEN: '${{ secrets.OA2_TOKEN }}', R: tlsgusdlf33/0A-2}
+    env: {GH_TOKEN: '${{ secrets.OA2_TOKEN }}', R: tlsgusdlf33/0A-2, DEL: '${{ inputs.delete_app }}'}
     steps:
       - run: |
           gh release list --repo $R --limit 300 --json tagName,createdAt -q 'sort_by(.createdAt) | reverse | .[].tagName' > tags
           declare -A seen
           while read t; do
+            if [ -n "$DEL" ]; then case "$t" in "$DEL"-v*) gh release delete "$t" --repo $R --yes --cleanup-tag && echo "삭제 $t";; esac; continue; fi
             case "$t" in video-*) continue;; appmaker-pc-*) k=appmaker-pc;; *) k="${t%%-v[0-9]*}";; esac
             if [ -n "${seen[$k]}" ]; then gh release delete "$t" --repo $R --yes --cleanup-tag && echo "삭제 $t"; else seen[$k]=1; echo "유지 $t"; fi
           done < tags
