@@ -35,7 +35,7 @@ jobs:
       - name: prepare (로그 비공개)
         run: cd src && python3 tools/prepare.py "$APP" > ../build.log 2>&1 || { echo "준비 실패"; exit 1; }
       - name: gradle (로그는 공개하지 않음)
-        run: cd work && gradle --no-daemon -q assembleRelease bundleRelease > ../build.log 2>&1 || { echo "빌드 실패"; exit 1; }
+        run: source ks.env && cd work && gradle --no-daemon -q assembleRelease bundleRelease > ../build.log 2>&1 || { echo "빌드 실패"; exit 1; }
       - run: cd src && python3 tools/release.py "$APP" "$REQ"
       - name: 개인정보처리방침 페이지 갱신(공개)
         run: |
@@ -50,4 +50,4 @@ jobs:
         env: {GH_TOKEN: '${{ github.token }}'}
         run: gh workflow run agent.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}"
       - if: always()
-        run: rm -rf work src build.log dist
+        run: rm -rf work src build.log dist ks.env

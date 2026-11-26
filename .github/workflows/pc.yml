@@ -17,10 +17,10 @@ jobs:
       - run: pip install -q -r src/pc/requirements.txt
       - name: 아이콘 생성
         run: cd src/tools && python -c "import art;im=art.grad(256,256,'#4F46E5');from PIL import ImageDraw;art.center(ImageDraw.Draw(im),(0,0,256,256),'App',art.font(90));im.save('../../appmaker.ico',sizes=[(256,256),(64,64),(32,32),(16,16)])"
-      - run: pyinstaller --noconfirm --onefile --windowed --noconsole --icon appmaker.ico --name 앱제작 --add-data "src/ui;ui" src/pc/appmaker.py > pyi.log 2>&1 || { tail -20 pyi.log; exit 1; }
+      - run: pyinstaller --noconfirm --onefile --windowed --noconsole --icon appmaker.ico --name AppMaker --add-data "src/ui;ui" src/pc/appmaker.py > pyi.log 2>&1 || { tail -20 pyi.log; exit 1; }
       - run: |
           TAG="appmaker-pc-$(date -u +%Y%m%d-%H%M)"
-          URL=$(gh release create "$TAG" "dist/앱제작.exe" --repo tlsgusdlf33/0A-2 --title "앱제작 PC 프로그램 $TAG" --notes "Windows 10/11용. 실행 후 설정 탭에 휴대폰과 같은 토큰을 입력하면 자동 연동됩니다.")
-          python src/tools/notify.py "앱제작 PC 프로그램 빌드 완료" "앱제작.exe 를 받아 더블클릭하면 실행(첫 실행 시 바탕화면 아이콘 생성)." "$URL"
+          URL=$(gh release create "$TAG" dist/AppMaker.exe --repo tlsgusdlf33/0A-2 --title "앱제작 PC 프로그램 $TAG" --notes "Windows 10/11용. 실행 후 설정 탭에 휴대폰과 같은 토큰을 입력하면 자동 연동됩니다.")
+          python src/tools/notify.py "앱제작 PC 프로그램 빌드 완료" "AppMaker.exe 를 받아 더블클릭하면 실행(첫 실행 시 바탕화면 아이콘 생성)." "$URL"
       - if: always()
         run: rm -rf src dist build
